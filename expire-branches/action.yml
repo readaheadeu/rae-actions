@@ -1,0 +1,45 @@
+name: "Expire Branches"
+description: "Delete matching expired branches of a GitHub repository"
+inputs:
+  date:
+    description: "Expiration date to match branches against"
+    required: true
+  repository:
+    description: "Owner and repository name (specified as: OWNER/REPOSITORY)"
+    required: true
+  wildcard:
+    description: "Wildcard to match branch names to consider for deletion"
+    required: true
+outputs:
+  branches:
+    description: "JSON-formatted list of deleted branches"
+    value: ${{ steps.script.outputs.branches }}
+runs:
+  using: "composite"
+  steps:
+  - id: script
+    name: "Run embedded script"
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RAE_ACTION_PATH: ${{ github.action_path }}
+      RAE_DATE: ${{ inputs.date }}
+      RAE_REPOSITORY: ${{ inputs.repository }}
+      RAE_WILDCARD: ${{ inputs.wildcard }}
+    run: |
+      RAE_BRANCHES=$( \
+          "${RAE_ACTION_PATH}/list.sh" \
+              "${RAE_REPOSITORY}" |
+          "${RAE_ACTION_PATH}/action.sh" \
+              "${RAE_REPOSITORY}" \
+              "${RAE_WILDCARD}" \
+              "${RAE_DATE}" \
+      )
+      echo "branches=${RAE_BRANCHES}" >> "${GITHUB_OUTPUT}"
+    shell: bash
+
+  - id: debug
+    name: "Debug output"
+    env:
+      RAE_BRANCHES: ${{ steps.script.outputs.branches }}
+    run: true
+    shell: bash

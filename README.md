@@ -16,6 +16,7 @@ release schedule, coding style and maintenance.
 
 The requirements for this project are:
 
+ * `coreutils >= 9.0`
  * `gh >= 2.28`
  * `jq >= 1.6`
 

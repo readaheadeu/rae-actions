@@ -32,3 +32,40 @@ jobs:
             '.[] | select(.name == "ci-test-assertion") | select(.date == "2023-04-25T09:36:13Z")' \
             <<< "${RAE_BRANCHES}"
       shell: bash
+
+  unittest-expire-branches:
+    name: "Unittest - Expire Branches"
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: "Fetch Sources"
+      uses: actions/checkout@v3
+
+    - name: "Create Test Data"
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RAE_REPOSITORY: ${{ github.repository }}
+      run: |
+        gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -X "POST" \
+            "/repos/${RAE_REPOSITORY}/git/refs" \
+            -f "ref=refs/heads/ci-test-expired-0" \
+            -f "sha=f7a0c3a108e1c91ec05f7bf163e5c410dfc5a636"
+      shell: bash
+
+    - id: action
+      name: "Run Action"
+      uses: ./expire-branches
+      with:
+        date: "2023-05-01"
+        repository: ${{ github.repository }}
+        wildcard: "ci-test-expired-*"
+
+    - name: "Verify Output"
+      env:
+        RAE_BRANCHES: ${{ steps.action.outputs.branches }}
+      run: |
+        [[ "${RAE_BRANCHES}" == '["ci-test-expired-0"]' ]]
+      shell: bash
