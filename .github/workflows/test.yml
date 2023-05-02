@@ -42,10 +42,16 @@ jobs:
       uses: actions/checkout@v3
 
     - name: "Create Test Data"
+      continue-on-error: true
       env:
         GH_TOKEN: ${{ github.token }}
         RAE_REPOSITORY: ${{ github.repository }}
       run: |
+        # We create a test-branch which we then delete in a follow-up. This is
+        # racy if the test runs several times in parallel. But it is simple
+        # enough and can be adjusted if we end up hitting it.
+        # We still set "continue-on-error: true" to gracefully avoid failing
+        # if the branch was left by a previous failure.
         gh api \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
