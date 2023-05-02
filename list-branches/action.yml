@@ -15,6 +15,7 @@ runs:
     name: "Run embedded script"
 
     env:
+      GH_TOKEN: ${{ github.token }}
       RAE_ACTION_PATH: ${{ github.action_path }}
       RAE_REPOSITORY: ${{ inputs.repository }}
     run: |
