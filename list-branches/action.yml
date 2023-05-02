@@ -1,0 +1,23 @@
+name: "List Branches"
+description: "List all branches of a GitHub repository with metadata"
+inputs:
+  repository:
+    description: "Owner and repository name (specified as: OWNER/REPOSITORY)"
+    required: true
+outputs:
+  branches:
+    description: "JSON-formatted list of branches with metadata"
+    value: ${{ steps.script.outputs.branches }}
+runs:
+  using: "composite"
+  steps:
+  - id: script
+    name: "Run embedded script"
+
+    env:
+      RAE_ACTION_PATH: ${{ github.action_path }}
+      RAE_REPOSITORY: ${{ inputs.repository }}
+    run: |
+      RAE_BRANCHES=$("${RAE_ACTION_PATH}/action.sh" "${RAE_REPOSITORY}")
+      echo "branches=$(RAE_BRANCHES)" >> "${GITHUB_OUTPUT}"
+    shell: bash
