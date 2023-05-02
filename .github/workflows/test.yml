@@ -59,7 +59,7 @@ jobs:
       name: "Run Action"
       uses: ./expire-branches
       with:
-        date: "2023-05-01"
+        date: "1 day ago"
         repository: ${{ github.repository }}
         wildcard: "ci-test-expired-*"
 
