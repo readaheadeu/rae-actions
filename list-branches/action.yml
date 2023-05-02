@@ -20,5 +20,5 @@ runs:
       RAE_REPOSITORY: ${{ inputs.repository }}
     run: |
       RAE_BRANCHES=$("${RAE_ACTION_PATH}/action.sh" "${RAE_REPOSITORY}")
-      echo "branches=$(RAE_BRANCHES)" >> "${GITHUB_OUTPUT}"
+      echo "branches=${RAE_BRANCHES}" >> "${GITHUB_OUTPUT}"
     shell: bash
