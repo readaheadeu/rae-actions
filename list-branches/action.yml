@@ -13,7 +13,6 @@ runs:
   steps:
   - id: script
     name: "Run embedded script"
-
     env:
       GH_TOKEN: ${{ github.token }}
       RAE_ACTION_PATH: ${{ github.action_path }}
@@ -21,4 +20,11 @@ runs:
     run: |
       RAE_BRANCHES=$("${RAE_ACTION_PATH}/action.sh" "${RAE_REPOSITORY}")
       echo "branches=${RAE_BRANCHES}" >> "${GITHUB_OUTPUT}"
+    shell: bash
+
+  - id: debug
+    name: "Debug output"
+    env:
+      RAE_BRANCHES: ${{ steps.script.outputs.branches }}
+    run: true
     shell: bash
