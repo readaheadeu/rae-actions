@@ -2,9 +2,14 @@ name: "Test Suite"
 
 on:
   pull_request:
-    branches: [ "main" ]
   push:
-    branches: [ "main", "wip/**" ]
+    branches-ignore: ["pr/**"]
+    tags: ["**"]
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: "bash"
 
 jobs:
   unittest-list-branches:
@@ -13,7 +18,7 @@ jobs:
 
     steps:
     - name: "Fetch Sources"
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - id: action
       name: "Run Action"
@@ -31,7 +36,6 @@ jobs:
         jq -ce \
             '.[] | select(.name == "ci-test-assertion") | select(.date == "2023-04-25T09:36:13Z")' \
             <<< "${RAE_BRANCHES}"
-      shell: bash
 
   unittest-expire-branches:
     name: "Unittest - Expire Branches"
@@ -39,7 +43,7 @@ jobs:
 
     steps:
     - name: "Fetch Sources"
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: "Create Test Data"
       continue-on-error: true
@@ -59,7 +63,6 @@ jobs:
             "/repos/${RAE_REPOSITORY}/git/refs" \
             -f "ref=refs/heads/ci-test-expired-0" \
             -f "sha=f7a0c3a108e1c91ec05f7bf163e5c410dfc5a636"
-      shell: bash
 
     - id: action
       name: "Run Action"
@@ -74,4 +77,3 @@ jobs:
         RAE_BRANCHES: ${{ steps.action.outputs.branches }}
       run: |
         [[ "${RAE_BRANCHES}" == '["ci-test-expired-0"]' ]]
-      shell: bash

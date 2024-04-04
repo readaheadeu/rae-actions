@@ -63,7 +63,7 @@ jobs:
 
     steps:
     - name: "Clone Repository"
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: "Determine Build Parameters"
 
@@ -112,7 +112,7 @@ jobs:
 
     steps:
     - name: "Clone Repository"
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: "Prepare QEMU Emulators"
       uses: docker/setup-qemu-action@v2
