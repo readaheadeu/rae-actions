@@ -1,7 +1,4 @@
-rae-actions
-===========
-
-Readahead.eu Custom GitHub Actions
+# rae-actions - Readahead GitHub Actions
 
 This is the home of a collection of custom GitHub Actions of readahead.eu. The
 different actions do not necessarily depend on each other, but they share a
@@ -9,8 +6,8 @@ release schedule, coding style and maintenance.
 
 ### Project
 
- * **Website**: <https://readahead.eu/lib/rae-actions>
- * **Bug Tracker**: <https://github.com/readaheadeu/rae-actions/issues>
+ * **Website**: <https://readahead.eu/p/rae-actions>
+ * **Bug Tracker**: <https://readahead.eu/p/rae-actions/issues>
 
 ### Requirements
 

@@ -1,4 +1,4 @@
-# rae-actions - Readahead.eu Custom GitHub Actions
+# rae-actions - Readahead GitHub Actions
 
 ## CHANGES WITH 1.0.0:
 
