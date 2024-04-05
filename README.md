@@ -1,6 +1,6 @@
 # rae-actions - Readahead GitHub Actions
 
-This is the home of a collection of custom GitHub Actions of readahead.eu. The
+This is the home of a collection of custom GitHub Actions of Readahead. The
 different actions do not necessarily depend on each other, but they share a
 release schedule, coding style and maintenance.
 
