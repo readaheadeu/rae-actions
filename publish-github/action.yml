@@ -1,6 +1,10 @@
 name: "Publish Github"
 description: "Publish a previously tagged release on Github"
 inputs:
+  ghtoken:
+    description: "GitHub Access Token"
+    default: ""
+    required: false
   tag:
     description: "Git-Tag to Publish"
     default: ""
@@ -25,7 +29,7 @@ runs:
 
   - name: "Publish GitHub"
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ inputs.ghtoken }}
       CTX_INPUTS_TAG: ${{ inputs.tag }}
       CTX_GITHUB_ACTION_PATH: ${{ github.action_path }}
       CTX_GITHUB_REPOSITORY: ${{ github.repository }}
