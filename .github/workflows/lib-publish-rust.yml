@@ -68,7 +68,7 @@ jobs:
         fi
 
     - name: "Publish GitHub"
-      uses: readaheadeu/rae-actions/publish-github@main
+      uses: readaheadeu/rae-actions/publish-github@v1
       with:
         ghtoken: ${{ secrets.GITHUB_TOKEN }}
         tag: ${{ inputs.tag }}
