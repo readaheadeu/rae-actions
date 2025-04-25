@@ -28,7 +28,7 @@ releases = sections[1:]
 notes = dict(map(lambda v: (v[:v.find(":")], v), releases))
 notes = notes[version].strip()
 
-relnotes = f"    {header}\n    ## CHANGES WITH {notes}"
+relnotes = f"    {header}\n\n    ## CHANGES WITH {notes}"
 
 #
 # Run `gh release create [...]` to publish the release.
