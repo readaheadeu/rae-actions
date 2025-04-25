@@ -1,0 +1,73 @@
+#
+# lib-publish-rust - Publish Rust Project
+#
+# This is a callable workflow that takes a Git-Tag of a project release as
+# argument and then publishes the local Rust crate to crates.io, and publishes
+# a GitHub release with the release notes.
+#
+
+name: "lib: publish rust project"
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        default: ""
+        description: "Git-Tag to Publish"
+        required: true
+        type: string
+      verify:
+        default: true
+        description: "Verify package before publishing"
+        required: false
+        type: boolean
+    secrets:
+      ciotoken:
+        description: "Access token to use with crates.io"
+        required: false
+
+concurrency:
+  cancel-in-progress: false
+  group: "publish"
+
+defaults:
+  run:
+    shell: "bash"
+
+jobs:
+  publish:
+    name: "Publish Crate"
+    runs-on: "ubuntu-latest"
+
+    env:
+      CTX_GITHUB_REPOSITORY: ${{ github.repository }}
+      CTX_INPUTS_TAG: ${{ inputs.tag }}
+      CTX_INPUTS_VERIFY: ${{ inputs.verify }}
+
+    steps:
+    - name: "Verify Input"
+      run: |
+        if [[ -z "${CTX_INPUTS_TAG}" ]] ; then
+          echo "error: empty git-tag specified as input"
+          exit 1
+        fi
+
+    - name: "Clone Repository"
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.tag }}
+
+    - name: "Publish Crate"
+      env:
+        CTX_SECRETS_CIOTOKEN: ${{ secrets.ciotoken }}
+      run: |
+        if [[ "${CTX_INPUTS_VERIFY}" = "false" ]] ; then
+          cargo publish --no-verify --token "${CTX_SECRETS_CIOTOKEN}"
+        else
+          cargo publish --token "${CTX_SECRETS_CIOTOKEN}"
+        fi
+
+    - name: "Publish GitHub"
+      uses: readaheadeu/rae-actions/publish-github@main
+      with:
+        tag: ${{ inputs.tag }}
