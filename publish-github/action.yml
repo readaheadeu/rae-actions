@@ -1,0 +1,38 @@
+name: "Publish Github"
+description: "Publish a previously tagged release on Github"
+inputs:
+  tag:
+    description: "Git-Tag to Publish"
+    default: ""
+    required: true
+runs:
+  using: "composite"
+  steps:
+  - name: "Verify Input"
+    env:
+      CTX_INPUTS_TAG: ${{ inputs.tag }}
+    shell: bash
+    run: |
+      if [[ -z "${CTX_INPUTS_TAG}" ]] ; then
+        echo "error: empty git-tag specified as input"
+        exit 1
+      fi
+
+  - name: "Clone Repository"
+    uses: actions/checkout@v3
+    with:
+      ref: ${{ inputs.tag }}
+
+  - name: "Publish GitHub"
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CTX_INPUTS_TAG: ${{ inputs.tag }}
+      CTX_GITHUB_ACTION_PATH: ${{ github.action_path }}
+      CTX_GITHUB_REPOSITORY: ${{ github.repository }}
+    shell: bash
+    run: |
+      python3 "${CTX_GITHUB_ACTION_PATH}/action.py" \
+        "${CTX_GITHUB_REPOSITORY#*/}" \
+        "${CTX_GITHUB_REPOSITORY}" \
+        "${CTX_INPUTS_TAG}" \
+        "${CTX_INPUTS_TAG#v}"
