@@ -58,7 +58,8 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      images: ${{ steps.parameters.outputs.images }}
+      images_flat: ${{ steps.parameters.outputs.images_flat }}
+      images_grouped: ${{ steps.parameters.outputs.images_grouped }}
       now: ${{ steps.parameters.outputs.now }}
 
     steps:
@@ -66,51 +67,78 @@ jobs:
       uses: actions/checkout@v4
 
     - name: "Determine Build Parameters"
-
-      id: parameters
-      working-directory: ${{ inputs.source }}
-
       env:
         CTX_INPUTS_TARGET: ${{ inputs.target }}
-
+      id: parameters
+      working-directory: ${{ inputs.source }}
       run: |
-        IMG_IMAGES=$(docker buildx bake --print "${CTX_INPUTS_TARGET}" | jq -ce ".target | keys")
+        IMG_IMAGES_FLAT=$(
+          docker buildx bake --print "${CTX_INPUTS_TARGET}" \
+            | jq -ce '[
+              (
+                .target
+                  | with_entries(select(.value.platforms | any(. == "linux/amd64")))
+                  | keys[] | { platform: "linux/amd64", target: ., runner: "ubuntu-latest"}
+              ),
+              (
+                .target
+                  | with_entries(select(.value.platforms | any(. == "linux/arm64")))
+                  | keys[] | { platform: "linux/arm64", target: ., runner: "ubuntu-24.04-arm" }
+              )
+            ]'
+        )
+        IMG_IMAGES_GROUPED=$(
+          jq -ce '[
+            group_by(.target)[] | { target: .[0].target, platforms: [.[].platform] }
+          ]' <<<"${IMG_IMAGES_FLAT}"
+        )
         IMG_NOW=$(date -u '+%Y%m%d%H%M')
 
-        echo "images=${IMG_IMAGES}" >>$GITHUB_OUTPUT
+        echo "images_flat=${IMG_IMAGES_FLAT}" >>$GITHUB_OUTPUT
+        echo "images_grouped=${IMG_IMAGES_GROUPED}" >>$GITHUB_OUTPUT
         echo "now=${IMG_NOW}" >>$GITHUB_OUTPUT
 
     - name: "Print Parameters"
       env:
-        CTX_STEPS_PARAMETERS_OUTPUTS_IMAGES: ${{ steps.parameters.outputs.images }}
+        CTX_STEPS_PARAMETERS_OUTPUTS_IMAGES_FLAT: ${{ steps.parameters.outputs.images_flat }}
+        CTX_STEPS_PARAMETERS_OUTPUTS_IMAGES_GROUPED: ${{ steps.parameters.outputs.images_grouped }}
         CTX_STEPS_PARAMETERS_OUTPUTS_NOW: ${{ steps.parameters.outputs.now }}
       run: |
-        echo "Images:"
-        echo "${CTX_STEPS_PARAMETERS_OUTPUTS_IMAGES}" | jq .
-        echo "End of Images"
+        echo "Images(flat):"
+        echo "${CTX_STEPS_PARAMETERS_OUTPUTS_IMAGES_FLAT}" | jq .
+        echo "End of Images(flat)"
+        echo "Images(grouped):"
+        echo "${CTX_STEPS_PARAMETERS_OUTPUTS_IMAGES_GROUPED}" | jq .
+        echo "End of Images(grouped)"
         echo "Now: ${CTX_STEPS_PARAMETERS_OUTPUTS_NOW}"
 
   #
-  # Build/Test Container Image
+  # Build/Test Container Images
   #
   # This job is run for each target. It builds the container image locally and
   # then runs configured tests (if any).
   #
-  ci:
+  build:
     name: "Container Build/Test"
-
     needs: config
-    runs-on: ubuntu-latest
 
     env:
-      RAE_UNIQUEID: ${{ needs.config.outputs.now }}
-
+      IMG_NOW: ${{ needs.config.outputs.now }}
+    runs-on: ${{ matrix.image.runner }}
     strategy:
       fail-fast: false
       matrix:
-        image: ${{ fromJson(needs.config.outputs.images) }}
+        image: ${{ fromJson(needs.config.outputs.images_flat) }}
 
     steps:
+    - name: "Authenticate to GHCR"
+      if: inputs.ghcruser != ''
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ inputs.ghcruser }}
+        password: ${{ secrets.ghcrpass }}
+
     - name: "Clone Repository"
       uses: actions/checkout@v4
 
@@ -120,38 +148,104 @@ jobs:
         daemon-config: |
           { "features": { "containerd-snapshotter": true } }
 
-    - name: "Prepare QEMU Emulators"
-      uses: docker/setup-qemu-action@v2
-
     - name: "Prepare Docker Buildx"
       id: buildx
       uses: docker/setup-buildx-action@v2
 
     - name: "Build Image"
-
       env:
-        CTX_MATRIX_IMAGE: ${{ matrix.image }}
-
+        CTX_MATRIX_IMAGE_PLATFORM: ${{ matrix.image.platform }}
+        CTX_MATRIX_IMAGE_TARGET: ${{ matrix.image.target }}
       working-directory: ${{ inputs.source }}
-      run: docker buildx bake --load "${CTX_MATRIX_IMAGE}"
+      run: |
+        docker buildx bake \
+          --load \
+          --set "*.platform=${CTX_MATRIX_IMAGE_PLATFORM}" \
+          "${CTX_MATRIX_IMAGE_TARGET}"
 
+    - name: "Deploy Preliminary Image to GHCR"
+      if: inputs.ghcruser != ''
+      env:
+        CTX_MATRIX_IMAGE_PLATFORM: ${{ matrix.image.platform }}
+        CTX_MATRIX_IMAGE_TARGET: ${{ matrix.image.target }}
+      working-directory: ${{ inputs.source }}
+      run: |
+        IMG_TAGS_JSON=$(
+          docker buildx bake --print "${CTX_MATRIX_IMAGE_TARGET}" \
+            | jq -ce '[.target[].tags[] | select(test("^ghcr.io"))]'
+        )
+        readarray -t IMG_TAGS < <(jq -cer '.[]' <<<"${IMG_TAGS_JSON}")
+
+        for IMG_T in "${IMG_TAGS[@]}" ; do
+          IMG_SUFFIX="${IMG_NOW}-${CTX_MATRIX_IMAGE_PLATFORM//\//_}"
+          echo "Pushing as: ${IMG_T}-${IMG_SUFFIX}"
+          docker tag "${IMG_T}" "${IMG_T}-${IMG_SUFFIX}"
+          docker push "${IMG_T}-${IMG_SUFFIX}"
+        done
+
+  #
+  # Deploy Container Images
+  #
+  # This job is run for each target. It combines possibly-multi-platform images
+  # and deploys them to selected registries.
+  #
+  deploy-ghcr:
+    name: "Container Deployment to GHCR"
+    if: inputs.deploy && inputs.ghcruser != ''
+    needs: [config, build]
+
+    env:
+      IMG_NOW: ${{ needs.config.outputs.now }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJson(needs.config.outputs.images_grouped) }}
+
+    steps:
     - name: "Authenticate to GHCR"
-      if: inputs.deploy && inputs.ghcruser != ''
-
+      if: inputs.ghcruser != ''
       uses: docker/login-action@v2
       with:
         registry: ghcr.io
         username: ${{ inputs.ghcruser }}
         password: ${{ secrets.ghcrpass }}
 
-    - name: "Deploy Image"
-      if: inputs.deploy && inputs.ghcruser != ''
+    - name: "Clone Repository"
+      uses: actions/checkout@v4
 
+    - name: "Prepare Docker Engine"
+      uses: docker/setup-docker-action@v4
+      with:
+        daemon-config: |
+          { "features": { "containerd-snapshotter": true } }
+
+    - name: "Prepare Docker Buildx"
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: "Combine & Deploy Images to GHCR"
       env:
-        CTX_MATRIX_IMAGE: ${{ matrix.image }}
-
+        CTX_MATRIX_IMAGE_TARGET: ${{ matrix.image.target }}
+        CTX_MATRIX_IMAGE_PLATFORMS: ${{ toJson(matrix.image.platforms) }}
       working-directory: ${{ inputs.source }}
       run: |
-        docker buildx bake --print "${CTX_MATRIX_IMAGE}" | \
-            jq -cer '.target[].tags[] | select(test("^ghcr.io"))' | \
-            xargs -L1 -- docker push
+        readarray -t IMG_PLATFORMS < <(jq -cer '.[]' <<<"${CTX_MATRIX_IMAGE_PLATFORMS}")
+
+        IMG_TAGS_JSON=$(
+          docker buildx bake --print "${CTX_MATRIX_IMAGE_TARGET}" \
+            | jq -ce '[.target[].tags[] | select(test("^ghcr.io"))]'
+        )
+        readarray -t IMG_TAGS < <(jq -cer '.[]' <<<"${IMG_TAGS_JSON}")
+
+        for IMG_T in "${IMG_TAGS[@]}" ; do
+          IMG_LIST=()
+          for IMG_P in "${IMG_PLATFORMS[@]}" ; do
+            IMG_SUFFIX="${IMG_NOW}-${IMG_P//\//_}"
+            echo "Pulling as: ${IMG_T}-${IMG_SUFFIX}"
+            docker pull "${IMG_T}-${IMG_SUFFIX}"
+            IMG_LIST+=("${IMG_T}-${IMG_SUFFIX}")
+          done
+          docker buildx imagetools create -t "${IMG_T}" "${IMG_LIST[@]}"
+          docker buildx imagetools create -t "${IMG_T}-${IMG_NOW}" "${IMG_LIST[@]}"
+        done
