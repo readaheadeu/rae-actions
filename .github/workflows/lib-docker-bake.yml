@@ -114,6 +114,12 @@ jobs:
     - name: "Clone Repository"
       uses: actions/checkout@v4
 
+    - name: "Prepare Docker Engine"
+      uses: docker/setup-docker-action@v4
+      with:
+        daemon-config: |
+          { "features": { "containerd-snapshotter": true } }
+
     - name: "Prepare QEMU Emulators"
       uses: docker/setup-qemu-action@v2
 
